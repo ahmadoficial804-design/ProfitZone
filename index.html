@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProfitZone</title>
+<style>
+*{box-sizing:border-box}
+:root{color-scheme:dark;--bg:#070b18;--panel:#10182b;--panel2:#151f36;--line:#263858;--cyan:#35e5ff;--blue:#477bff;--purple:#a855f7;--text:#edf5ff;--muted:#91a5c5}
+body{margin:0;font-family:Arial,sans-serif;background:radial-gradient(ellipse at top left,#15254b 0%,#090f20 42%,#060914 100%);color:var(--text);padding-bottom:100px;min-height:100vh}
+header{background:linear-gradient(120deg,#101d3b,#172e59 55%,#33205b);color:white;padding:25px 20px 24px;border-radius:0 0 26px 26px;border-bottom:1px solid #3d6bb4;box-shadow:0 10px 35px #0005}
+header h1{margin:0;font-size:28px;font-weight:800;letter-spacing:.5px;background:linear-gradient(90deg,#fff,var(--cyan));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+header p{margin:8px 0 0;font-size:13px;color:#b9cbea;letter-spacing:.4px}
+main{max-width:560px;margin:auto;padding:18px 15px}
+.balance,.panel{background:linear-gradient(145deg,#131e34,#0e1628);padding:20px;border:1px solid var(--line);border-radius:19px;margin-bottom:17px;box-shadow:0 12px 30px #0003;overflow-wrap:anywhere}
+.balance{background:linear-gradient(120deg,#102c4a,#14254b 60%,#2a1b4a);border-color:#286b9b;position:relative;overflow:hidden}
+.balance:after{content:"";display:block;position:absolute;width:110px;height:110px;border:1px solid #35e5ff35;border-radius:50%;right:-35px;top:-35px;box-shadow:0 0 0 18px #35e5ff08,0 0 0 36px #35e5ff05;pointer-events:none}
+.balance small{color:#b3c8e8}
+.amount{font-size:32px;font-weight:800;color:var(--cyan);margin:12px 0;text-shadow:0 0 22px #35e5ff25;overflow-wrap:anywhere}
+h2{font-size:19px;margin:0 0 14px;color:#f0f6ff}
+h3{color:var(--cyan)}
+.panel p{color:#a7b8d2;line-height:1.65}
+label{display:block;color:#c8d8f0;font-size:13px;font-weight:700;margin-top:5px}
+button{cursor:pointer;transition:transform .15s,filter .15s}
+button:active{transform:scale(.98)}
+.action{background:linear-gradient(100deg,#167bdc,#5265ff 60%,#8b45dc);color:white;border:1px solid #6ca9ff55;border-radius:11px;padding:13px 15px;width:100%;font-weight:700;font-size:14px;box-shadow:0 5px 18px #345dff25}
+.action:hover{filter:brightness(1.13)}
+input,select,textarea{display:block;width:100%;padding:13px;margin:8px 0 16px;border:1px solid #2b4165;border-radius:10px;background:#0a1222;color:#f0f6ff;font-size:15px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--cyan);box-shadow:0 0 0 3px #35e5ff16}
+input::placeholder,textarea::placeholder{color:#7186a7}
+input[type=file]{font-size:12px}
+input:disabled,select:disabled,button:disabled{opacity:.55;cursor:not-allowed}
+.note{text-align:center;font-size:12px;color:#8da4c6;line-height:1.6}
+.bottom-nav{position:fixed;bottom:0;left:0;width:100%;background:#0b1223f5;backdrop-filter:blur(16px);display:flex;justify-content:space-around;align-items:center;padding:9px 2px calc(9px + env(safe-area-inset-bottom));border-top:1px solid #273958;box-shadow:0 -8px 28px #0005;z-index:10}
+.nav-btn{flex:1;min-width:0;border:0;background:transparent;color:#8295b5;font-size:11px;padding:5px 1px;display:flex;align-items:center;gap:5px;flex-direction:column}
+.nav-btn .ico{font-size:21px}
+.nav-btn.active{color:var(--cyan);font-weight:bold;text-shadow:0 0 14px #35e5ff35}
+.hidden{display:none!important}
+#deposit-details,#withdraw-account-loading,#withdraw-account-saved,#transaction-history{overflow-wrap:anywhere}
+#deposit-details p,#withdraw-account-saved p{padding:10px 12px;background:#0a1324;border:1px solid #243653;border-radius:9px}
+#extra{background:#0b1427;border-color:#263858}
+@media(min-width:600px){main{padding-top:24px}.balance,.panel{padding:23px}}
+</style>
+</head>
+<body>
+<header>
+<h1>ProfitZone</h1>
+<p>Your Tasks. Your Progress.</p>
+</header>
+
+<main>
+<section id="home" class="page">
+<div class="balance">
+<small>Demo Available Balance</small>
+<div class="amount" id="wallet-balance">Rs. 0.00</div>
+<small>Demo balance — no real funds</small>
+</div>
+<div class="panel">
+<div style="display:flex;align-items:center;gap:12px">
+<img id="member-avatar"
+     src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+     alt="Profile Avatar"
+     style="width:60px;height:60px;border-radius:50%;object-fit:cover">
+<input id="avatar-upload" type="file" accept="image/*" style="display:none">
+<button class="action" type="button" onclick="document.getElementById('avatar-upload').click()">Change Photo</button>
+<div>
+<h2 style="margin:0">Welcome, <span id="member-username">Member</span></h2>
+<p style="margin:4px 0">ProfitZone Account</p>
+</div>
+</div>
+<p>Manage your tasks, referrals and account from the menu below.</p>
+<button class="action" onclick="window.location.href='/tasks'">Explore Tasks</button>
+</div>
+<div class="panel">
+<h2>Account Overview</h2>
+<p>Daily tasks: Demo only</p>
+<p>Referral rewards: Not activated</p>
+<div class="panel" id="referral-panel">
+  <h3>Your invite code</h3>
+  <p id="referral-code">Loading…</p>
+  <button class="action" id="referral-copy-code" type="button">Copy code</button>
+  <p id="referral-link" style="overflow-wrap:anywhere"></p>
+  <button class="action" id="referral-share" type="button">Share invite link</button>
+  <p id="referral-count">Referrals: 0</p>
+  <p id="referral-inviter"></p>\n  <h4>Members Joined Using Your Link</h4>\n  <div id="referral-members">Loading members…</div>
+  <p class="note">Referral rewards are not enabled.</p>
+</div>
+<p>Payments: Not connected</p>
+</div>
+</section>
+
+<section id="tasks" class="page hidden">
+<div class="panel">
+<h2>Daily Tasks</h2>
+<p>Available tasks will appear here when configured by the administrator.</p>
+<p>No tasks available yet.</p>
+</div>
+</section>
+
+
+
+<section id="plans" class="page hidden">
+  <div class="panel">
+    <h2>Investment Plans</h2>
+    <p>Choose an active plan. Your wallet balance will be checked before purchase.</p>
+    <div id="plans-message" role="status">Loading plans…</div>
+    <div id="plans-list"></div>
+  </div>
+  <div class="panel">
+    <h2>My Plan Purchases</h2>
+    <div id="my-plans-list">Loading purchase history…</div>
+  </div>
+</section>
+
+<section id="deposit" class="page hidden">
+<div class="panel">
+<h2>Deposit Request</h2>
+<div id="deposit-details" class="note">Loading payment details…</div>
+<form id="deposit-form">
+<label>Amount (PKR)</label>
+<input id="deposit-amount" type="number" min="1" max="1000000"
+step="0.01" required placeholder="Enter amount">
+<label>Payment Method</label>
+<select id="deposit-method" required>
+<option value="">Choose method</option>
+<option value="JazzCash">JazzCash</option>
+<option value="Easypaisa">Easypaisa</option>
+</select>
+<label>Payment Reference / Transaction ID</label>
+<input id="deposit-reference" maxlength="120" required
+placeholder="Enter transaction reference">
+<label>Receipt screenshot (JPG, PNG or WebP; max 5 MB)</label>
+<input id="deposit-receipt" type="file"
+accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" required>
+<button class="action" type="submit">Submit Deposit Request</button>
+</form>
+<p id="deposit-msg" class="note"></p>
+</div>
+</section>
+
+
+<section id="withdraw" class="page hidden">
+<div class="panel">
+<h2>Withdrawal Account</h2>
+<p>Your first saved account cannot be changed. Each account number can belong to one user only.</p>
+
+<div id="withdraw-account-loading">Loading account details…</div>
+
+<form id="withdraw-account-form" class="hidden">
+<label>Account holder name</label>
+<input id="withdraw-account-name" maxlength="100" required
+       autocomplete="name" placeholder="Name registered with wallet">
+<label>Payment method</label>
+<select id="withdraw-account-method" required>
+<option value="">Choose method</option>
+<option value="JazzCash">JazzCash</option>
+<option value="Easypaisa">Easypaisa</option>
+</select>
+<label>Account number</label>
+<input id="withdraw-account-number" type="tel" maxlength="40"
+       required autocomplete="tel" placeholder="Enter wallet number">
+<button class="action" type="submit">Save Account Permanently</button>
+</form>
+
+<div id="withdraw-account-saved" class="hidden"></div>
+<p id="withdraw-account-msg" class="note"></p>
+</div>
+
+<div id="withdraw-request-panel" class="panel hidden">
+<h2>Withdrawal Request</h2>
+<p>Request submission does not itself transfer money or deduct your balance.</p>
+<form id="withdraw-request-form">
+<label>Amount (PKR)</label>
+<input id="withdraw-amount" type="number" min="1" max="1000000"
+       step="1" required placeholder="Enter amount">
+<label>Reference (optional)</label>
+<input id="withdraw-reference" maxlength="120"
+       placeholder="Optional note for admin">
+<button class="action" type="submit">Submit Withdrawal Request</button>
+</form>
+<p id="withdraw-msg" class="note"></p>
+</div>
+</section>
+
+<section id="more" class="page hidden">
+<div class="panel">
+<h2>More Options</h2>
+<button class="action" onclick="showExtra('referrals')">👥 Referrals</button><br><br>
+<button class="action" onclick="showExtra('transactions')">📊 Transactions</button><br><br>
+<button class="action" onclick="showExtra('support')">💬 Customer Support</button><br><br>
+<button class="action" onclick="logoutUser()">🚪 Logout</button>
+<div id="extra" class="panel hidden"></div>
+</div>
+</section>
+<p class="note">ProfitZone demo · Real accounts and payments are not connected.</p>
+</main>
+
+<nav class="bottom-nav">
+<button class="nav-btn active" data-page="home" onclick="showPage('home')"><span class="ico">⌂</span>Home</button>
+<button class="nav-btn" data-page="plans" onclick="showPage('plans')"><span class="ico">▣</span>Plans</button>
+<button class="nav-btn" data-page="deposit" onclick="showPage('deposit')"><span class="ico">＋</span>Deposit</button>
+<button class="nav-btn" data-page="withdraw" onclick="showPage('withdraw')"><span class="ico">↗</span>Withdraw</button>
+<button class="nav-btn" data-page="more" onclick="showPage('more')"><span class="ico">☰</span>More</button>
+</nav>
+
+<script>
+
+async function logoutUser() {
+  if (!confirm("Are you sure you want to log out?")) return;
+
+  try {
+    const response = await fetch("/api/logout", {
+      method: "POST",
+      credentials: "same-origin"
+    });
+
+    if (!response.ok) throw new Error("Logout failed");
+
+    window.location.href = "/";
+  } catch (error) {
+    alert("Logout failed. Please try again.");
+  }
+}
+
+
+
+
+function showPage(id){
+  const target = document.getElementById(id);
+  if (!target) {
+    console.error('Page not found:', id);
+    return;
+  }
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+  target.classList.remove('hidden');
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.page === id);
+  });
+  window.scrollTo(0, 0);
+  if (id === 'withdraw') loadWithdrawalAccount();
+  if (id === 'plans') loadPlans();
+}
+function demoMessage(){
+const page=document.querySelector('.page:not(.hidden)');
+const msg=page.querySelector('[id$="-msg"]');
+if(msg)msg.textContent='Demo only: request was not sent or saved.';
+}
+function showExtra(type){
+const box=document.getElementById('extra');
+box.classList.remove('hidden');
+const content={
+referrals:'<h3>Referrals</h3><p>Your referral code and rewards will appear here after setup.</p>',
+transactions:'<h3>Transactions</h3><div id="transaction-history">Loading transactions…</div>',
+support:'<h3>Customer Support</h3><p>Contact us on WhatsApp for help.</p><a class="action" href="https://whatsapp.com/channel/0029VbBbr4CDDmFV2RnQ0S21" target="_blank" style="display:inline-block;text-decoration:none">📢 Join WhatsApp Channel</a>'
+};
+box.innerHTML=content[type];
+if(type==='transactions') loadTransactionHistory();
+}
+
+async function loadTransactionHistory(){
+  const box=document.getElementById('transaction-history');
+  if(!box) return;
+  box.textContent='Loading transactions…';
+  try{
+    const r=await fetch('/api/wallet',{credentials:'same-origin'});
+    const data=await r.json();
+    if(!r.ok) throw new Error(data.error||'Could not load transactions.');
+    const items=data.transactions||[];
+    box.replaceChildren();
+    if(!items.length){
+      box.textContent='No transactions yet.';
+      return;
+    }
+    items.forEach(t=>{
+      const card=document.createElement('div');
+      card.style.cssText='border:1px solid #555;border-radius:10px;padding:12px;margin:10px 0;overflow-wrap:anywhere;';
+      const title=document.createElement('strong');
+      title.textContent=(t.type||'transaction').replaceAll('_',' ').replace(/^./,c=>c.toUpperCase());
+      const amount=document.createElement('p');
+      amount.textContent='Amount: Rs. '+(Number(t.amount_paisa||0)/100).toFixed(2);
+      const status=document.createElement('p');
+      status.textContent='Status: '+(t.status||'Pending');
+      const date=document.createElement('p');
+      date.textContent='Date: '+(t.created_at||'—');
+      card.append(title,amount,status,date);
+      box.append(card);
+    });
+  }catch(e){
+    box.textContent=e.message;
+  }
+}
+
+async function loadDepositSettings(){
+  const box = document.getElementById('deposit-details');
+  const method = document.getElementById('deposit-method');
+  if(!box || !method) return;
+  try{
+    const r = await fetch('/api/payment-settings', {credentials:'same-origin'});
+    if(r.status === 401){
+      box.textContent = 'Please log in to view payment details.';
+      return;
+    }
+    const data = await r.json();
+    const x = data.settings;
+    if(!r.ok || !x){
+      box.textContent = 'Payment details are not configured yet. Please contact the administrator.';
+      method.disabled = true;
+      return;
+    }
+    box.replaceChildren();
+    if (x.qr_image) {
+      const label = document.createElement('p');
+      const strong = document.createElement('strong');
+      strong.textContent = 'Payment QR Code';
+      label.append(strong);
+      const img = document.createElement('img');
+      img.src = '/payment-qr/' + encodeURIComponent(x.qr_image);
+      img.alt = 'Payment QR Code';
+      img.style.maxWidth = '240px';
+      img.style.width = '100%';
+      img.style.height = 'auto';
+      img.style.display = 'block';
+      img.style.margin = '8px 0 16px';
+      box.append(label, img);
+    }
+    [
+      ['Payment Method', x.method],
+      ['Account Name', x.account_name],
+      ['Payment Number', x.account_number],
+      ['Instructions', x.instructions || 'Follow the payment provider instructions.']
+    ].forEach(([label,value])=>{
+      const row = document.createElement('p');
+      const strong = document.createElement('strong');
+      strong.textContent = label + ': ';
+      row.append(strong, document.createTextNode(value || '—'));
+      box.append(row);
+    });
+    method.value = x.method;
+    method.disabled = true;
+  }catch(e){
+    box.textContent = 'Could not load payment details. Please try again.';
+  }
+}
+
+const depositForm = document.getElementById('deposit-form');
+if(depositForm){
+  depositForm.addEventListener('submit', async e=>{
+    e.preventDefault();
+    const msg = document.getElementById('deposit-msg');
+    const file = document.getElementById('deposit-receipt').files[0];
+    const method = document.getElementById('deposit-method').value;
+    if(!file){ msg.textContent = 'Please attach your receipt screenshot.'; return; }
+    if(file.size > 5 * 1024 * 1024){
+      msg.textContent = 'Image must be 5 MB or smaller.'; return;
+    }
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type)){
+      msg.textContent = 'Use a JPG, PNG or WebP image.'; return;
+    }
+    const body = new FormData();
+    body.append('type','deposit');
+    body.append('amount',document.getElementById('deposit-amount').value);
+    body.append('method',method);
+    body.append('reference',document.getElementById('deposit-reference').value);
+    body.append('receipt',file);
+    msg.textContent = 'Submitting request…';
+    try{
+      const r = await fetch('/api/payment-requests',{
+        method:'POST', credentials:'same-origin', body
+      });
+      const data = await r.json();
+      if(!r.ok) throw new Error(data.error || 'Request failed');
+      msg.textContent = data.message || 'Request submitted for admin review.';
+      depositForm.reset();
+      await loadDepositSettings();
+    }catch(err){ msg.textContent = err.message; }
+  });
+}
+
+
+async function loadWithdrawalAccount() {
+  const loading = document.getElementById('withdraw-account-loading');
+  const form = document.getElementById('withdraw-account-form');
+  const saved = document.getElementById('withdraw-account-saved');
+  const requestPanel = document.getElementById('withdraw-request-panel');
+  const msg = document.getElementById('withdraw-account-msg');
+
+  if (!loading || !form || !saved || !requestPanel) return;
+
+  loading.classList.remove('hidden');
+  loading.textContent = 'Loading account details…';
+  form.classList.add('hidden');
+  saved.classList.add('hidden');
+  requestPanel.classList.add('hidden');
+  msg.textContent = '';
+
+  try {
+    const r = await fetch('/api/withdrawal-account', {
+      credentials: 'same-origin'
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Could not load account.');
+
+    loading.classList.add('hidden');
+
+    if (data.account) {
+      const a = data.account;
+      saved.replaceChildren();
+      [
+        ['Account holder', a.account_name],
+        ['Payment method', a.method],
+        ['Account number', a.account_number],
+        ['Saved on', a.created_at]
+      ].forEach(([label, value]) => {
+        const row = document.createElement('p');
+        const strong = document.createElement('strong');
+        strong.textContent = label + ': ';
+        row.append(strong, document.createTextNode(value || '—'));
+        saved.append(row);
+      });
+
+      const lockNote = document.createElement('p');
+      lockNote.textContent = 'This account is locked and cannot be changed.';
+      saved.append(lockNote);
+      saved.classList.remove('hidden');
+      requestPanel.classList.remove('hidden');
+    } else {
+      form.classList.remove('hidden');
+      loading.textContent = '';
+    }
+  } catch (e) {
+    loading.textContent = e.message;
+  }
+}
+
+const withdrawalAccountForm = document.getElementById('withdraw-account-form');
+if (withdrawalAccountForm) {
+  withdrawalAccountForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const msg = document.getElementById('withdraw-account-msg');
+    const button = withdrawalAccountForm.querySelector('button[type="submit"]');
+    button.disabled = true;
+    msg.textContent = 'Saving account…';
+
+    try {
+      const r = await fetch('/api/withdrawal-account', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          account_name: document.getElementById('withdraw-account-name').value,
+          method: document.getElementById('withdraw-account-method').value,
+          account_number: document.getElementById('withdraw-account-number').value
+        })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Could not save account.');
+      msg.textContent = data.message || 'Account saved.';
+      withdrawalAccountForm.reset();
+      await loadWithdrawalAccount();
+    } catch (err) {
+      msg.textContent = err.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
+const withdrawalRequestForm = document.getElementById('withdraw-request-form');
+if (withdrawalRequestForm) {
+  withdrawalRequestForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const msg = document.getElementById('withdraw-msg');
+    const button = withdrawalRequestForm.querySelector('button[type="submit"]');
+    button.disabled = true;
+    msg.textContent = 'Submitting request…';
+
+    try {
+      const r = await fetch('/api/payment-requests', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          type: 'withdraw',
+          amount: document.getElementById('withdraw-amount').value,
+          reference: document.getElementById('withdraw-reference').value
+        })
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Request failed.');
+      msg.textContent = data.message || 'Request submitted for admin review.';
+      withdrawalRequestForm.reset();
+    } catch (err) {
+      msg.textContent = err.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
+async function loadWalletBalance() {
+  try {
+    const response = await fetch('/api/wallet');
+    if (response.status === 401) return;
+    if (!response.ok) throw new Error('Wallet load failed');
+
+    const data = await response.json();
+    const amount = document.querySelector('.balance .amount');
+
+    if (amount) {
+      amount.textContent = 'Rs. ' +
+        (Number(data.balance_paisa || 0) / 100).toFixed(2);
+    }
+  } catch (error) {
+    console.error('Wallet balance load nahi hua:', error);
+  }
+}
+
+loadWalletBalance();
+loadDepositSettings();
+
+async function loadPlans() {
+  const message = document.getElementById('plans-message');
+  const list = document.getElementById('plans-list');
+  const history = document.getElementById('my-plans-list');
+  if (!message || !list || !history) return;
+
+  message.textContent = 'Loading plans…';
+  list.replaceChildren();
+  history.textContent = 'Loading purchase history…';
+
+  try {
+    const response = await fetch('/api/plans', { credentials: 'same-origin' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Plans load nahi ho sake.');
+
+    message.textContent = data.plans.length ? 'Available plans' : 'Abhi koi active plan available nahi hai.';
+    for (const plan of data.plans) {
+      const card = document.createElement('div');
+      card.className = 'panel';
+
+      const title = document.createElement('h3');
+      title.textContent = plan.name;
+      const price = document.createElement('p');
+      price.textContent = 'Price: Rs. ' + (Number(plan.price_paisa) / 100).toFixed(2);
+      const duration = document.createElement('p');
+      duration.textContent = 'Duration: ' + plan.duration_days + ' days';
+      const rate = document.createElement('p');
+      rate.textContent = 'Daily Profit: ' + Number(plan.daily_profit_percent || 0).toFixed(2) + '%';
+      const buy = document.createElement('button');
+      buy.className = 'action';
+      buy.textContent = 'Buy Plan';
+
+      buy.addEventListener('click', async () => {
+        if (!confirm('Buy "' + plan.name + '" for Rs. ' +
+          (Number(plan.price_paisa) / 100).toFixed(2) + '?')) return;
+
+        buy.disabled = true;
+        message.textContent = 'Purchase request bheji ja rahi hai…';
+        try {
+          const key = (typeof crypto !== 'undefined' && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+
+          const result = await fetch('/api/plans/' + encodeURIComponent(plan.id) + '/buy', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idempotency_key: key })
+          });
+          const resultData = await result.json();
+          if (!result.ok) throw new Error(resultData.error || 'Purchase complete nahi hui.');
+
+          message.textContent = resultData.message || 'Plan purchase successful.';
+          await loadWalletBalance();
+          await loadPlans();
+        } catch (error) {
+          message.textContent = error.message;
+        } finally {
+          buy.disabled = false;
+        }
+      });
+
+      card.append(title, price, duration, rate, buy);
+      list.append(card);
+    }
+
+    history.replaceChildren();
+    if (!data.purchases.length) {
+      history.textContent = 'Abhi koi plan purchase history nahi hai.';
+    } else {
+      for (const purchase of data.purchases) {
+        const item = document.createElement('div');
+        item.className = 'panel';
+        const title = document.createElement('h3');
+        title.textContent = purchase.plan_name;
+        const details = document.createElement('p');
+        details.textContent = 'Price: Rs. ' +
+          (Number(purchase.price_paisa) / 100).toFixed(2) +
+          ' · Duration: ' + purchase.duration_days + ' days · Status: ' + purchase.status;
+        const dates = document.createElement('p');
+        dates.textContent = 'Purchased: ' + purchase.purchased_at +
+          ' · Expires: ' + purchase.expires_at;
+        item.append(title, details, dates);
+        history.append(item);
+      }
+    }
+  } catch (error) {
+    message.textContent = error.message;
+    history.textContent = 'Purchase history load nahi ho saki.';
+  }
+}
+
+
+async function loadReferralInfo() {
+  try {
+    const response = await fetch('/api/me');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Could not load referral details.');
+    const code = data.referral_code || '';
+    const link = window.location.origin + '/?ref=' + encodeURIComponent(code);
+    document.getElementById('referral-code').textContent = code || 'Not available';
+    document.getElementById('referral-link').textContent = link;
+    document.getElementById('referral-count').textContent = 'Referrals: ' + (data.referral_count || 0);
+    document.getElementById('referral-inviter').textContent =
+      data.inviter_username ? 'Invited by: ' + data.inviter_username : 'Invited by: —';
+    const memberList = document.getElementById('referral-members');
+    if (memberList) {
+      const response = await fetch('/api/my-referrals', {credentials: 'same-origin'});
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not load referred members.');
+      memberList.replaceChildren();
+      if (!result.referrals.length) {
+        memberList.textContent = 'No members have joined using your link yet.';
+      } else {
+        result.referrals.forEach(member => {
+          const item = document.createElement('p');
+          item.textContent = member.username + ' — Joined: ' + (member.created_at || 'Date unavailable');
+          memberList.append(item);
+        });
+      }
+    }
+    document.getElementById('referral-copy-code').onclick = async () => {
+      try { await navigator.clipboard.writeText(code); alert('Invite code copied.'); }
+      catch (_) { alert('Your invite code: ' + code); }
+    };
+    document.getElementById('referral-share').onclick = async () => {
+      try {
+        if (navigator.share) await navigator.share({title:'Join ProfitZone', url:link, text:'Use my invite code: ' + code});
+        else { await navigator.clipboard.writeText(link); alert('Invite link copied.'); }
+      } catch (error) {
+        if (error.name !== 'AbortError') alert('Invite link: ' + link);
+      }
+    };
+  } catch (error) {
+    const el = document.getElementById('referral-code');
+    if (el) el.textContent = 'Could not load referral details.';
+  }
+}
+
+
+async function loadMemberProfile(){
+  try{
+    const r = await fetch('/api/me', {credentials:'same-origin'});
+    const d = await r.json();
+    const el = document.getElementById('member-username');
+    if(el && d.username) el.textContent = d.username;
+  }catch(e){}
+}
+
+
+
+async function loadMemberAvatar(){
+  try{
+    const r = await fetch('/api/me', {credentials:'same-origin'});
+    const d = await r.json();
+
+    const img = document.getElementById('member-avatar');
+    if(img && d.avatar){
+      img.src = '/avatar/' + encodeURIComponent(d.avatar);
+    }
+
+    const upload = document.getElementById('avatar-upload');
+    if(upload){
+      upload.addEventListener('change', async ()=>{
+        const file = upload.files[0];
+        if(!file) return;
+
+        const form = new FormData();
+        form.append('avatar', file);
+
+        const res = await fetch('/api/avatar-upload', {
+          method:'POST',
+          credentials:'same-origin',
+          body:form
+        });
+
+        const result = await res.json();
+
+        if(!res.ok){
+          alert(result.error || 'Upload failed');
+          return;
+        }
+
+        if(img && result.avatar){
+          img.src = '/avatar/' + encodeURIComponent(result.avatar) + '?t=' + Date.now();
+        }
+
+        alert('Profile photo updated');
+      });
+    }
+
+  }catch(e){}
+}
+
+loadMemberProfile();
+loadMemberAvatar();
+
+loadReferralInfo();
+</script>
+</body>
+</html>
+

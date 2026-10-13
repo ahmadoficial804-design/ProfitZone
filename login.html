@@ -1,0 +1,116 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProfitZone | Account</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b1220;color:#fff;font-family:Arial,sans-serif;min-height:100vh;display:grid;place-items:center;padding:20px}
+.card{width:100%;max-width:390px;background:#151f32;padding:24px;border-radius:18px;border:1px solid #293852}
+h1{text-align:center;color:#45e0a0;margin:0 0 8px}
+p{text-align:center;color:#b8c3d6;font-size:14px}
+.tabs{display:flex;gap:8px;margin:22px 0}
+button{cursor:pointer;border:0;border-radius:9px;padding:13px;font-weight:bold}
+.tabs button{flex:1;background:#26344c;color:white}
+.tabs button.active,.submit{background:#28cf91;color:#07150f}
+input{width:100%;padding:13px;margin:7px 0;border-radius:9px;border:1px solid #34445e;background:#0b1220;color:white;font-size:15px}
+.submit{width:100%;margin-top:12px;font-size:16px}
+#message{line-height:1.5;overflow-wrap:anywhere}
+.small{font-size:12px}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>ProfitZone</h1>
+<p>Create your account or log in</p>
+
+<div class="tabs">
+<button id="signupTab" class="active" onclick="showForm('signup')">Sign Up</button>
+<button id="loginTab" onclick="showForm('login')">Login</button>
+</div>
+
+<form id="signupForm">
+<input name="username" placeholder="Username" minlength="3" maxlength="30" required>
+<input name="email" type="email" placeholder="Email" maxlength="254" required>
+<input name="phone" type="tel" placeholder="Phone number" maxlength="30" required>
+<input name="password" type="password" placeholder="Password (10+ characters)" minlength="10" maxlength="128" autocomplete="new-password" required>
+<input name="invitation_code" placeholder="Invitation code (optional)" maxlength="50">
+<button class="submit" type="submit">Create Account</button>
+</form>
+
+<form id="loginForm" hidden>
+<input name="identity" placeholder="Username, email or phone" required>
+<input name="password" type="password" placeholder="Password" maxlength="128" autocomplete="current-password" required>
+<button class="submit" type="submit">Login</button>
+</form>
+
+<p id="message" role="status"></p>
+<p class="small">Demo project: no real deposits, withdrawals or earnings.</p>
+</div>
+
+<script>
+const msg = document.getElementById('message');
+
+function showForm(mode) {
+  document.getElementById('signupForm').hidden = mode !== 'signup';
+  document.getElementById('loginForm').hidden = mode !== 'login';
+  document.getElementById('signupTab').classList.toggle('active', mode === 'signup');
+  document.getElementById('loginTab').classList.toggle('active', mode === 'login');
+  msg.textContent = '';
+}
+
+async function sendForm(path, data) {
+  msg.textContent = 'Please wait...';
+  try {
+    const response = await fetch(path, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify(data)
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Request failed');
+    msg.textContent = result.message + (result.username ? ': ' + result.username : '');
+    if (path === '/api/login' || path === '/api/signup') {
+      msg.textContent += '. Opening dashboard...';
+      window.location.href = '/dashboard';
+    }
+  } catch (error) {
+    msg.textContent = 'Error: ' + error.message;
+  }
+}
+
+document.getElementById('signupForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  await sendForm('/api/signup', {
+    username: f.get('username'),
+    email: f.get('email'),
+    phone: f.get('phone'),
+    password: f.get('password'),
+    invitation_code: f.get('invitation_code')
+  });
+});
+
+document.getElementById('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  await sendForm('/api/login', {
+    identity: f.get('identity'),
+    password: f.get('password')
+  });
+});
+
+const referralFromUrl = new URLSearchParams(window.location.search).get('ref');
+if (referralFromUrl) {
+  const invitationInput = document.querySelector('#signupForm [name="invitation_code"]');
+  if (invitationInput) invitationInput.value = referralFromUrl;
+}
+
+</script>
+</body>
+</html>
+
+

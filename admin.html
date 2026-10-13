@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ProfitZone Admin</title>
+<style>
+:root{color-scheme:dark;--bg:#070b18;--panel:#10182b;--panel2:#151f37;--line:#283655;--text:#eef4ff;--muted:#9aa9c7;--blue:#4f8cff;--cyan:#42d9f5;--purple:#9b7bff}
+*{box-sizing:border-box}
+body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;max-width:1440px;margin:0 auto;padding:28px 22px 48px;background:radial-gradient(ellipse at 12% 0%,rgba(57,105,220,.2),transparent 35%),radial-gradient(ellipse at 95% 8%,rgba(139,92,246,.15),transparent 28%),var(--bg);color:var(--text);line-height:1.5}
+h1{font-size:clamp(28px,4vw,42px);letter-spacing:-1.3px;margin:0 0 6px;font-weight:800;background:linear-gradient(90deg,#fff,#8edfff 55%,#a99aff);-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{font-size:19px;letter-spacing:-.3px;margin:0 0 16px;display:flex;align-items:center;gap:10px}
+h2:before{content:"";display:inline-block;width:4px;height:21px;border-radius:8px;background:linear-gradient(var(--cyan),var(--purple));box-shadow:0 0 14px rgba(66,217,245,.45)}
+h3{margin:0 0 8px;color:#dbeafe}
+p{line-height:1.6}.muted{color:var(--muted)}
+.card{background:linear-gradient(145deg,rgba(20,30,53,.97),rgba(12,19,36,.98));border:1px solid var(--line);padding:22px;margin:16px 0;border-radius:18px;overflow-wrap:anywhere;box-shadow:0 12px 32px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.025)}
+button{padding:10px 15px;margin:4px;border:1px solid rgba(124,174,255,.28);border-radius:10px;background:linear-gradient(135deg,#397bff,#6554dc);color:white;font-weight:700;letter-spacing:.1px;cursor:pointer;box-shadow:0 5px 14px rgba(57,123,255,.18);transition:transform .15s ease,filter .15s ease}
+button:hover{filter:brightness(1.13);transform:translateY(-1px)}button:active{transform:translateY(0)}
+input,textarea,select{background:#0b1223!important;color:var(--text)!important;border:1px solid #314363!important;border-radius:10px!important;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--cyan)!important;box-shadow:0 0 0 3px rgba(66,217,245,.12)}
+label{display:block;color:#c5d4ee;font-size:13px;font-weight:650;margin-top:10px}
+table{border-spacing:0;border-collapse:separate!important;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:rgba(7,13,27,.55)}
+th{background:linear-gradient(90deg,#192746,#202344);color:#bfeeff;font-size:12px;text-transform:uppercase;letter-spacing:.6px;white-space:nowrap}
+th,td{padding:12px!important;border-bottom:1px solid #263450!important}
+td{color:#dce7fb;font-size:13px}tr:last-child td{border-bottom:0!important}tbody tr:hover{background:rgba(79,140,255,.08)}
+img{border-radius:10px;border:1px solid var(--line)}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#0b1223;padding:12px;border-radius:10px}
+#availableTasks .card{background:linear-gradient(135deg,#151f38,#11182b)}
+body>button{margin:14px 6px 0 0}
+@media(max-width:640px){body{padding:18px 12px 32px}.card{padding:16px;border-radius:14px}h2{font-size:17px}th,td{padding:10px!important}.card form button{width:100%;margin:7px 0}}
+</style>
+</head><body>
+<h1>ProfitZone Admin</h1><p class="muted">Admin account only · Review requests carefully</p>
+<button onclick="loadAll()">Refresh</button>
+<button onclick="adminLogout()">Admin Logout</button>
+
+<div class="card">
+<h2>Add Member Balance</h2>
+<input id="balanceUsername" placeholder="Member username" style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box">
+<input id="balanceAmount" type="number" placeholder="Amount Rs" style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box">
+<button type="button" id="addBalanceBtn">Add Balance</button>
+<p id="balanceMessage"></p>
+</div>
+
+<div class="card"><h2>Users</h2>
+<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;text-align:left">
+<thead><tr><th>ID</th><th>Username</th><th>Email</th><th>Phone</th><th>Wallet Balance</th><th>Joined</th></tr></thead>
+<tbody id="users"><tr><td colspan="6">Loading…</td></tr></tbody>
+</table></div></div>
+<div class="card">
+<h2>Task Management</h2>
+<form id="taskForm">
+<label>Task key (unique, e.g. watch_video)</label>
+<input id="taskKey" required maxlength="40" pattern="[A-Za-z0-9_]+"
+style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box">
+<label>Task title</label>
+<input id="taskTitle" required maxlength="100"
+style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box">
+<label>Description</label>
+<textarea id="taskDescription" required maxlength="500"
+style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box"></textarea>
+<label>Reward (PKR, display only)</label>
+<input id="taskReward" type="number" min="0" max="1000000" step="0.01" value="0" required
+style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box">
+<button type="submit">Add Task</button>
+</form><p id="taskFormMessage"></p>
+<div id="availableTasks"></div>
+</div>
+
+
+<div class="card">
+<h2>Investment Plans</h2>
+<form id="planForm">
+<label>Plan name</label>
+<input id="planName" required maxlength="100" style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box">
+<label>Price (PKR)</label>
+<input id="planPrice" type="number" min="0.01" max="1000000" step="0.01" required style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box">
+<label>Daily Profit (%)</label>
+<input id="planDailyProfit" type="number" min="0" max="100000" step="0.01" required value="0" style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box">
+<label>Duration (days)</label>
+<input id="planDuration" type="number" min="1" max="36500" step="1" required style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box">
+<input id="planId" type="hidden">
+<button id="planSaveButton" type="submit">Add Plan</button>
+<button id="planCancelButton" type="button" hidden>Cancel Edit</button>
+</form>
+<p id="planMessage"></p>
+<div id="plansList">Loading plans…</div>
+</div>
+
+<div class="card">
+<h2>Deposit Payment Settings</h2>
+<p class="muted">These details will be shown to logged-in members.</p>
+<form id="paymentSettingsForm">
+<label>Payment Method</label>
+<select id="payMethod" required style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box">
+<option value="JazzCash">JazzCash</option>
+<option value="Easypaisa">Easypaisa</option>
+</select>
+<label>Account Holder Name</label>
+<input id="payName" required maxlength="100" style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box">
+<label>Payment Number</label>
+<input id="payNumber" required maxlength="50" style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box">
+<label>Instructions for members</label>
+<textarea id="payInstructions" maxlength="500" style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box"></textarea>
+<label>Payment QR Image (JPG, PNG, WEBP; max 5 MB)</label>
+      <input id="paymentQrFile" type="file" accept="image/jpeg,image/png,image/webp" style="display:block;margin:8px 0">
+      <button type="button" id="uploadPaymentQr">Upload QR Image</button>
+      <p id="paymentQrMessage"></p>
+      <img id="paymentQrPreview" alt="Current payment QR" style="display:none;max-width:220px;width:100%;height:auto;margin:10px 0">
+      <button type="submit">Save Payment Settings</button>
+<button type="button" id="clearPaymentSettings">Delete / Hide Payment Details</button>
+</form>
+<p id="paymentSettingsMessage"></p>
+</div>
+<div class="card">
+<h2>Deposits</h2>
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;text-align:left">
+<thead><tr>
+<th>ID</th><th>User</th><th>Amount</th><th>Method</th><th>Reference</th><th>Status / Actions</th><th>Receipt</th>
+</tr></thead>
+<tbody id="deposits"><tr><td colspan="7">Loading…</td></tr></tbody>
+</table>
+</div></div>
+
+<div class="card">
+<h2>Withdrawals</h2>
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;text-align:left">
+<thead><tr>
+<th>ID</th><th>User</th><th>Amount</th><th>Method</th><th>Account</th><th>Status / Actions</th><th>Receipt</th>
+</tr></thead>
+<tbody id="withdrawals"><tr><td colspan="7">Loading…</td></tr></tbody>
+</table>
+</div></div>
+<div class="card"><h2>Task submissions</h2>
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;text-align:left">
+<thead><tr>
+<th style="padding:10px;border-bottom:1px solid #ddd">Username</th>
+<th style="padding:10px;border-bottom:1px solid #ddd">Task</th>
+<th style="padding:10px;border-bottom:1px solid #ddd">Date</th>
+<th style="padding:10px;border-bottom:1px solid #ddd">Status</th>
+<th style="padding:10px;border-bottom:1px solid #ddd">Action</th>
+</tr></thead>
+<tbody id="tasks"><tr><td colspan="5">Loading…</td></tr></tbody>
+</table></div></div>
+<script>
+async function adminLogout(){
+  try {
+    await fetch('/api/admin/logout', {
+      method:'POST', credentials:'same-origin'
+    });
+  } finally {
+    location.href='/admin/login';
+  }
+}
+
+async function api(url, options={}) {
+  const r=await fetch(url,{credentials:'same-origin',...options,
+    headers:{'Content-Type':'application/json',...(options.headers||{})}});
+  const raw=await r.text();
+  let d;
+  try { d=JSON.parse(raw); }
+  catch { throw Error('API '+url+' returned HTTP '+r.status+
+    ' ('+(r.headers.get('content-type')||'unknown content type')+'): '+
+    raw.slice(0,160)); }
+  if(!r.ok) throw Error(d.error||('HTTP '+r.status));
+  return d;
+}
+function el(id, text){document.getElementById(id).textContent=text;}
+function cardText(x){return JSON.stringify(x,null,2);}
+
+async function loadPaymentSettings(){
+  try{
+    const d = await api('/api/admin/payment-settings');
+    const x = d.settings || {};
+    document.getElementById('payMethod').value =
+      x.method === 'Easypaisa' ? 'Easypaisa' : 'JazzCash';
+    document.getElementById('payName').value = x.account_name || '';
+    document.getElementById('payNumber').value = x.account_number || '';
+    document.getElementById('payInstructions').value = x.instructions || '';
+    const qrPreview = document.getElementById('paymentQrPreview');
+    if (x.qr_image) {
+      qrPreview.src = '/payment-qr/' + encodeURIComponent(x.qr_image);
+      qrPreview.style.display = 'block';
+    } else {
+      qrPreview.removeAttribute('src');
+      qrPreview.style.display = 'none';
+    }
+    el('paymentSettingsMessage', x.enabled ? 'Payment details are enabled.' : 'No active payment details.');
+  }catch(e){
+    el('paymentSettingsMessage', e.message);
+  }
+}
+
+document.getElementById('uploadPaymentQr').addEventListener('click', async ()=>{
+  const file = document.getElementById('paymentQrFile').files[0];
+  const msg = document.getElementById('paymentQrMessage');
+  if (!file) { msg.textContent = 'Choose a QR image first.'; return; }
+  if (file.size > 5 * 1024 * 1024) { msg.textContent = 'Image must be 5 MB or smaller.'; return; }
+  if (!['image/jpeg','image/png','image/webp'].includes(file.type)) {
+    msg.textContent = 'Only JPG, PNG, or WEBP images are allowed.'; return;
+  }
+  const form = new FormData();
+  form.append('qr_image', file);
+  try {
+    const r = await fetch('/api/admin/payment-qr', {
+      method:'POST', credentials:'same-origin', body:form
+    });
+    const d = await r.json();
+    if (!r.ok) throw Error(d.error || ('HTTP ' + r.status));
+    const preview = document.getElementById('paymentQrPreview');
+    preview.src = '/payment-qr/' + encodeURIComponent(d.qr_image) + '?v=' + Date.now();
+    preview.style.display = 'block';
+    msg.textContent = 'QR image uploaded successfully.';
+    document.getElementById('paymentQrFile').value = '';
+  } catch (e) { msg.textContent = e.message || 'QR upload failed.'; }
+});
+
+document.getElementById('paymentSettingsForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  try{
+    await api('/api/admin/payment-settings', {
+      method:'POST',
+      body:JSON.stringify({
+        method:document.getElementById('payMethod').value,
+        account_name:document.getElementById('payName').value,
+        account_number:document.getElementById('payNumber').value,
+        instructions:document.getElementById('payInstructions').value
+      })
+    });
+    el('paymentSettingsMessage','Payment settings saved successfully.');
+  }catch(err){
+    el('paymentSettingsMessage',err.message);
+  }
+});
+document.getElementById('clearPaymentSettings').addEventListener('click', async ()=>{
+  if(!confirm('Hide and clear the current payment details?')) return;
+  try{
+    await api('/api/admin/payment-settings',{method:'DELETE'});
+    document.getElementById('paymentSettingsForm').reset();
+    el('paymentSettingsMessage','Payment details cleared.');
+  }catch(err){
+    el('paymentSettingsMessage',err.message);
+  }
+});
+
+async function loadAll(){
+  loadPlans();
+  loadPaymentSettings();
+  try{
+    const [u,p,t,a]=await Promise.all([
+      api('/api/admin/users'),api('/api/admin/payments'),
+      api('/api/admin/tasks'),api('/api/admin/available-tasks')
+    ]);
+    renderAvailableTasks(a.tasks||[]);
+    const ud=document.getElementById('users');
+    ud.replaceChildren();
+    (u.users||[]).forEach(x=>{
+      const tr=document.createElement('tr');
+      [
+        x.id, x.username, x.email, x.phone,
+        'Rs. '+((Number(x.balance_paisa)||0)/100).toFixed(2),
+        x.created_at
+      ].forEach(value=>{
+        const td=document.createElement('td');
+        td.style.padding='10px';
+        td.style.borderBottom='1px solid #ddd';
+        td.textContent=value ?? '—';
+        tr.append(td);
+      });
+      ud.append(tr);
+    });
+    if(!(u.users||[]).length){
+      const tr=document.createElement('tr');
+      const td=document.createElement('td');
+      td.colSpan=6;
+      td.textContent='No users found.';
+      tr.append(td);
+      ud.append(tr);
+    }
+    const deposits=document.getElementById('deposits');
+    const withdrawals=document.getElementById('withdrawals');
+    deposits.replaceChildren();
+    withdrawals.replaceChildren();
+
+    (p.requests||[]).forEach(x=>{
+      const isWithdrawal=x.request_type === 'withdraw';
+      const target=isWithdrawal ? withdrawals : deposits;
+      const tr=document.createElement('tr');
+
+      const addCell=(value)=>{
+        const td=document.createElement('td');
+        td.style.padding='10px';
+        td.style.borderBottom='1px solid #ddd';
+        td.textContent=value ?? '—';
+        tr.append(td);
+        return td;
+      };
+
+      addCell(x.id);
+      addCell((x.username || ('User '+x.user_id))+' (#'+x.user_id+')');
+      addCell('Rs. '+((Number(x.amount_paisa)||0)/100).toFixed(2));
+      addCell(x.method || '—');
+
+      if(isWithdrawal){
+        addCell(x.withdrawal_account_name
+          ? x.withdrawal_account_name+' / '+(x.withdrawal_account_number||'')
+          : (x.reference || '—'));
+      } else {
+        addCell(x.reference || '—');
+      }
+
+      const actionCell=document.createElement('td');
+      actionCell.style.padding='10px';
+      actionCell.style.borderBottom='1px solid #ddd';
+
+      const status=document.createElement('p');
+      status.textContent='Status: '+(x.status || '—');
+      actionCell.append(status);
+
+      const updateStatus=async(newStatus,label)=>{
+        if(!confirm('Change status to '+label+'?')) return;
+        try{
+          await api('/api/admin/payments/'+x.id,{
+            method:'POST',
+            body:JSON.stringify({status:newStatus})
+          });
+          await loadAll();
+        }catch(e){alert(e.message)}
+      };
+
+      if(isWithdrawal){
+        if(!['completed','approved','rejected'].includes(x.status)){
+          [
+            ['pending','Pending'],
+            ['in_progress','In Progress'],
+            ['completed','Completed'],
+            ['rejected','Rejected']
+          ].forEach(([value,label])=>{
+            const b=document.createElement('button');
+            b.textContent=label;
+            b.style.margin='4px';
+            b.onclick=()=>updateStatus(value,label);
+            actionCell.append(b);
+          });
+        }
+      } else if(x.status === 'pending'){
+        [['approved','Approve'],['rejected','Reject']].forEach(([value,label])=>{
+          const b=document.createElement('button');
+          b.textContent=label;
+          b.style.margin='4px';
+          b.onclick=()=>updateStatus(value,label);
+          actionCell.append(b);
+        });
+      }
+      tr.append(actionCell);
+
+      const receiptCell=document.createElement('td');
+      receiptCell.style.padding='10px';
+      receiptCell.style.borderBottom='1px solid #ddd';
+      if(x.screenshot_filename){
+        const image=document.createElement('img');
+        image.src='/api/admin/payment-receipts/'+encodeURIComponent(x.screenshot_filename);
+        image.alt='Payment receipt';
+        image.loading='lazy';
+        image.style.maxWidth='180px';
+        image.style.maxHeight='180px';
+        image.style.objectFit='contain';
+        image.onerror=()=>{image.alt='Receipt preview unavailable';};
+        receiptCell.append(image);
+      } else {
+        receiptCell.textContent='No receipt image';
+      }
+      tr.append(receiptCell);
+      target.append(tr);
+    });
+
+    if(!deposits.children.length){
+      deposits.innerHTML='<tr><td colspan="7">No deposits found.</td></tr>';
+    }
+    if(!withdrawals.children.length){
+      withdrawals.innerHTML='<tr><td colspan="7">No withdrawals found.</td></tr>';
+    }
+    const td=document.getElementById('tasks');
+    td.replaceChildren();
+    (t.tasks||[]).forEach(x=>{
+      const tr=document.createElement('tr');
+      const values=[
+        x.username || ('User '+x.user_id),
+        x.title || x.task_key,
+        x.created_at || '—',
+        x.status || '—'
+      ];
+      values.forEach(value=>{
+        const cell=document.createElement('td');
+        cell.style.padding='10px';
+        cell.style.borderBottom='1px solid #ddd';
+        cell.textContent=value;
+        tr.append(cell);
+      });
+      const action=document.createElement('td');
+      action.style.padding='10px';
+      action.style.borderBottom='1px solid #ddd';
+      if(x.status==='pending'){
+        for(const status of ['approved','rejected']){
+          const b=document.createElement('button');
+          b.textContent=status==='approved'?'Approve':'Reject';
+          b.onclick=async()=>{
+            try{
+              await api('/api/admin/tasks/'+x.id,{
+                method:'POST',
+                body:JSON.stringify({status})
+              });
+              await loadAll();
+            }catch(e){alert(e.message)}
+          };
+          action.append(b,document.createTextNode(' '));
+        }
+      }else{
+        action.textContent='—';
+      }
+      tr.append(action);
+      td.append(tr);
+    });
+  }catch(e){alert(e.message)}
+}
+
+
+function resetPlanForm(){
+  document.getElementById('planForm').reset();
+  document.getElementById('planId').value='';
+  document.getElementById('planSaveButton').textContent='Add Plan';
+  document.getElementById('planCancelButton').hidden=true;
+}
+document.getElementById('planCancelButton').addEventListener('click',resetPlanForm);
+
+async function loadPlans(){
+  const box=document.getElementById('plansList');
+  try{
+    const d=await api('/api/admin/plans');
+    box.replaceChildren();
+    (d.plans||[]).forEach(x=>{
+      const card=document.createElement('div');
+      card.className='card';
+      const title=document.createElement('h3');
+      title.textContent=x.name;
+      const meta=document.createElement('p');
+      meta.textContent='Price: Rs. '+(Number(x.price_paisa)/100).toFixed(2)
+        +' · Duration: '+x.duration_days+' days · Daily profit: '
++Number(x.daily_profit_percent||0).toFixed(2)+'% · '
++(x.active?'Active':'Inactive');
+      const edit=document.createElement('button');
+      edit.textContent='Edit';
+      edit.onclick=()=>{
+        document.getElementById('planId').value=x.id;
+        document.getElementById('planName').value=x.name;
+        document.getElementById('planPrice').value=(Number(x.price_paisa)/100).toFixed(2);
+        document.getElementById('planDuration').value=x.duration_days;
+        document.getElementById('planDailyProfit').value=Number(x.daily_profit_percent||0);
+        document.getElementById('planSaveButton').textContent='Save Changes';
+        document.getElementById('planCancelButton').hidden=false;
+        document.getElementById('planMessage').textContent='Editing plan #'+x.id;
+        document.getElementById('planForm').scrollIntoView({behavior:'smooth',block:'center'});
+      };
+      const toggle=document.createElement('button');
+      toggle.textContent=x.active?'Deactivate':'Activate';
+      toggle.onclick=async()=>{
+        try{
+          await api('/api/admin/plans/'+x.id+'/toggle',{method:'POST',body:'{}'});
+          await loadPlans();
+        }catch(e){alert(e.message);}
+      };
+      card.append(title,meta,edit,document.createTextNode(' '),toggle);
+      box.append(card);
+    });
+    if(!(d.plans||[]).length) box.textContent='No plans yet.';
+  }catch(e){box.textContent='Could not load plans: '+e.message;}
+}
+
+document.getElementById('planForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const msg=document.getElementById('planMessage');
+  msg.textContent='Saving...';
+  const id=document.getElementById('planId').value;
+  const payload={
+    name:document.getElementById('planName').value.trim(),
+    price:document.getElementById('planPrice').value,
+    duration_days:document.getElementById('planDuration').value,
+    daily_profit_percent:document.getElementById('planDailyProfit').value
+  };
+  try{
+    await api(id?'/api/admin/plans/'+id:'/api/admin/plans',{
+      method:'POST',body:JSON.stringify(payload)
+    });
+    resetPlanForm();
+    msg.textContent=id?'Plan updated.':'Plan added.';
+    await loadPlans();
+  }catch(err){msg.textContent=err.message;}
+});
+
+function renderAvailableTasks(tasks){
+  const box=document.getElementById('availableTasks');
+  box.replaceChildren();
+  tasks.forEach(x=>{
+    const d=document.createElement('div');d.className='card';
+    const h=document.createElement('h3');h.textContent=x.title;d.append(h);
+    const p=document.createElement('p');p.textContent=x.description;d.append(p);
+    const meta=document.createElement('p');
+    meta.textContent='Key: '+x.task_key+' · Reward: Rs. '+(Number(x.reward_paisa||0)/100).toFixed(2)+' · '+(x.active?'Active':'Inactive');
+    d.append(meta);
+    const b=document.createElement('button');b.textContent=x.active?'Deactivate':'Activate';
+    b.onclick=async()=>{try{await api('/api/admin/available-tasks/'+encodeURIComponent(x.task_key)+'/toggle',{method:'POST',body:'{}'});await loadAll()}catch(e){alert(e.message)}};
+    d.append(b);box.append(d);
+  });
+  if(!tasks.length) box.textContent='No tasks yet.';
+}
+document.getElementById('taskForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const msg=document.getElementById('taskFormMessage');
+  msg.textContent='Saving...';
+  try{
+    await api('/api/admin/available-tasks',{method:'POST',body:JSON.stringify({
+      task_key:document.getElementById('taskKey').value.trim(),
+      title:document.getElementById('taskTitle').value.trim(),
+      description:document.getElementById('taskDescription').value.trim(),
+      reward:document.getElementById('taskReward').value
+    })});
+    e.target.reset();document.getElementById('taskReward').value='0';
+    msg.textContent='Task added.';await loadAll();
+  }catch(err){msg.textContent=err.message}
+});
+
+loadAll();
+
+
+document.getElementById('addBalanceBtn')?.addEventListener('click', async ()=>{
+  const msg = document.getElementById('balanceMessage');
+
+  try{
+    const data = await api('/api/admin/add-balance', {
+      method:'POST',
+      body: JSON.stringify({
+        username: document.getElementById('balanceUsername').value.trim(),
+        amount: Number(document.getElementById('balanceAmount').value)
+      })
+    });
+
+    msg.textContent = data.message || 'Balance added successfully.';
+  }catch(e){
+    msg.textContent = e.message;
+  }
+});
+
+
+</script></body></html>
