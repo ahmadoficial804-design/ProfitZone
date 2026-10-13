@@ -1,4 +1,17 @@
 __pycache__/
+*.pyc
+*.db
+*.bak
+*.backup
+.env*
+*.before*
+*.patch
+*_backup*
+admin*.backup*
+index*.backup*
+users*.before*
+payment_qr/
+__pycache__/
 *.db
 *.pyc
 .env
