@@ -24,7 +24,7 @@ if not app.secret_key:
         "Set PROFITZONE_SECRET before starting the app."
     )
 
-DB = os.environ.get("PROFITZONE_DB", os.path.join(os.path.dirname(__file__), "users.db"))
+DB = os.environ.get("PROFITZONE_DB", "/tmp/users.db")
 
 
 def get_db():
