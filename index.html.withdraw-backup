@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProfitZone</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f2f7fa;color:#193447;padding-bottom:85px}
+header{background:linear-gradient(120deg,#087f8c,#1768ac);color:white;padding:22px 18px;border-radius:0 0 22px 22px}
+header h1{margin:0;font-size:26px}
+header p{margin:6px 0 0;font-size:13px}
+main{max-width:500px;margin:auto;padding:16px}
+.balance,.panel{background:white;padding:20px;border-radius:17px;margin-bottom:16px;box-shadow:0 4px 15px #12331710}
+.balance small{color:#71818c}
+.amount{font-size:30px;font-weight:bold;color:#078b78;margin:10px 0}
+h2{font-size:20px;margin-top:0}
+.panel p{color:#647985;line-height:1.6}
+button{cursor:pointer}
+.action{background:#078b78;color:white;border:0;border-radius:10px;padding:12px;width:100%;font-weight:bold}
+.bottom-nav{position:fixed;bottom:0;left:0;width:100%;background:white;display:flex;justify-content:space-around;align-items:center;padding:9px 2px calc(9px + env(safe-area-inset-bottom));box-shadow:0 -3px 18px #12331815;z-index:10}
+.nav-btn{flex:1;border:0;background:white;color:#71818c;font-size:11px;padding:5px 1px;display:flex;align-items:center;gap:4px;flex-direction:column}
+.nav-btn .ico{font-size:21px}
+.nav-btn.active{color:#078b78;font-weight:bold}
+.hidden{display:none}
+input,select,textarea{width:100%;padding:12px;margin:7px 0 14px;border:1px solid #d5e1e7;border-radius:9px;font-size:15px}
+.note{text-align:center;font-size:12px;color:#71818c;line-height:1.5}
+</style>
+</head>
+<body>
+<header>
+<h1>ProfitZone</h1>
+<p>Your Tasks. Your Progress.</p>
+</header>
+
+<main>
+<section id="home" class="page">
+<div class="balance">
+<small>Demo Available Balance</small>
+<div class="amount" id="wallet-balance">Rs. 0.00</div>
+<small>Demo balance — no real funds</small>
+</div>
+<div class="panel">
+<h2>Welcome to ProfitZone</h2>
+<p>Manage your tasks, referrals and account from the menu below.</p>
+<button class="action" onclick="window.location.href='/tasks'">Explore Tasks</button>
+</div>
+<div class="panel">
+<h2>Account Overview</h2>
+<p>Daily tasks: Demo only</p>
+<p>Referral rewards: Not activated</p>
+<p>Payments: Not connected</p>
+</div>
+</section>
+
+<section id="tasks" class="page hidden">
+<div class="panel">
+<h2>Daily Tasks</h2>
+<p>Available tasks will appear here when configured by the administrator.</p>
+<p>No tasks available yet.</p>
+</div>
+</section>
+
+
+<section id="deposit" class="page hidden">
+<div class="panel">
+<h2>Deposit Request</h2>
+<div id="deposit-details" class="note">Loading payment details…</div>
+<form id="deposit-form">
+<label>Amount (PKR)</label>
+<input id="deposit-amount" type="number" min="1" max="1000000"
+step="0.01" required placeholder="Enter amount">
+<label>Payment Method</label>
+<select id="deposit-method" required>
+<option value="">Choose method</option>
+<option value="JazzCash">JazzCash</option>
+<option value="Easypaisa">Easypaisa</option>
+</select>
+<label>Payment Reference / Transaction ID</label>
+<input id="deposit-reference" maxlength="120" required
+placeholder="Enter transaction reference">
+<label>Receipt screenshot (JPG, PNG or WebP; max 5 MB)</label>
+<input id="deposit-receipt" type="file"
+accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" required>
+<button class="action" type="submit">Submit Deposit Request</button>
+</form>
+<p id="deposit-msg" class="note"></p>
+</div>
+</section>
+
+
+<section id="withdraw" class="page hidden">
+<div class="panel">
+<h2>Withdraw</h2>
+<p>Real withdrawals are not enabled in this demo.</p>
+<label>Amount (PKR)</label>
+<input type="number" min="1" placeholder="Enter amount">
+<label>Payment Method</label>
+<select><option>Choose method</option><option>JazzCash</option><option>Easypaisa</option></select>
+<label>Account number</label>
+<input type="tel" placeholder="03XXXXXXXXX">
+<button class="action" onclick="demoMessage()">Submit Demo Request</button>
+<p id="withdraw-msg" class="note"></p>
+</div>
+</section>
+
+<section id="more" class="page hidden">
+<div class="panel">
+<h2>More Options</h2>
+<button class="action" onclick="showExtra('referrals')">👥 Referrals</button><br><br>
+<button class="action" onclick="showExtra('transactions')">📊 Transactions</button><br><br>
+<button class="action" onclick="showExtra('support')">💬 Customer Support</button><br><br>
+<button class="action" onclick="logoutUser()">🚪 Logout</button>
+<div id="extra" class="panel hidden"></div>
+</div>
+</section>
+<p class="note">ProfitZone demo · Real accounts and payments are not connected.</p>
+</main>
+
+<nav class="bottom-nav">
+<button class="nav-btn active" data-page="home" onclick="showPage('home')"><span class="ico">⌂</span>Home</button>
+<button class="nav-btn" data-page="tasks" onclick="window.location.href='/tasks'"><span class="ico">☷</span>Tasks</button>
+<button class="nav-btn" data-page="deposit" onclick="showPage('deposit')"><span class="ico">＋</span>Deposit</button>
+<button class="nav-btn" data-page="withdraw" onclick="showPage('withdraw')"><span class="ico">↗</span>Withdraw</button>
+<button class="nav-btn" data-page="more" onclick="showPage('more')"><span class="ico">☰</span>More</button>
+</nav>
+
+<script>
+
+async function logoutUser() {
+  if (!confirm("Are you sure you want to log out?")) return;
+
+  try {
+    const response = await fetch("/api/logout", {
+      method: "POST",
+      credentials: "same-origin"
+    });
+
+    if (!response.ok) throw new Error("Logout failed");
+
+    window.location.href = "/";
+  } catch (error) {
+    alert("Logout failed. Please try again.");
+  }
+}
+
+
+
+
+function showPage(id){
+  const target = document.getElementById(id);
+  if (!target) {
+    console.error('Page not found:', id);
+    return;
+  }
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+  target.classList.remove('hidden');
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.page === id);
+  });
+  window.scrollTo(0, 0);
+}
+function demoMessage(){
+const page=document.querySelector('.page:not(.hidden)');
+const msg=page.querySelector('[id$="-msg"]');
+if(msg)msg.textContent='Demo only: request was not sent or saved.';
+}
+function showExtra(type){
+const box=document.getElementById('extra');
+box.classList.remove('hidden');
+const content={
+referrals:'<h3>Referrals</h3><p>Your referral code and rewards will appear here after setup.</p>',
+transactions:'<h3>Transactions</h3><p>No transactions recorded in this demo.</p>',
+support:'<h3>Customer Support</h3><p>Support tickets are not connected yet.</p><textarea placeholder="Write your question"></textarea><button class="action" onclick="alert(\'Demo only: message not sent.\')">Send Demo Message</button>'
+};
+box.innerHTML=content[type];
+}
+
+async function loadDepositSettings(){
+  const box = document.getElementById('deposit-details');
+  const method = document.getElementById('deposit-method');
+  if(!box || !method) return;
+  try{
+    const r = await fetch('/api/payment-settings', {credentials:'same-origin'});
+    if(r.status === 401){
+      box.textContent = 'Please log in to view payment details.';
+      return;
+    }
+    const data = await r.json();
+    const x = data.settings;
+    if(!r.ok || !x){
+      box.textContent = 'Payment details are not configured yet. Please contact the administrator.';
+      method.disabled = true;
+      return;
+    }
+    box.replaceChildren();
+    [
+      ['Payment Method', x.method],
+      ['Account Name', x.account_name],
+      ['Payment Number', x.account_number],
+      ['Instructions', x.instructions || 'Follow the payment provider instructions.']
+    ].forEach(([label,value])=>{
+      const row = document.createElement('p');
+      const strong = document.createElement('strong');
+      strong.textContent = label + ': ';
+      row.append(strong, document.createTextNode(value || '—'));
+      box.append(row);
+    });
+    method.value = x.method;
+    method.disabled = true;
+  }catch(e){
+    box.textContent = 'Could not load payment details. Please try again.';
+  }
+}
+
+const depositForm = document.getElementById('deposit-form');
+if(depositForm){
+  depositForm.addEventListener('submit', async e=>{
+    e.preventDefault();
+    const msg = document.getElementById('deposit-msg');
+    const file = document.getElementById('deposit-receipt').files[0];
+    const method = document.getElementById('deposit-method').value;
+    if(!file){ msg.textContent = 'Please attach your receipt screenshot.'; return; }
+    if(file.size > 5 * 1024 * 1024){
+      msg.textContent = 'Image must be 5 MB or smaller.'; return;
+    }
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type)){
+      msg.textContent = 'Use a JPG, PNG or WebP image.'; return;
+    }
+    const body = new FormData();
+    body.append('type','deposit');
+    body.append('amount',document.getElementById('deposit-amount').value);
+    body.append('method',method);
+    body.append('reference',document.getElementById('deposit-reference').value);
+    body.append('receipt',file);
+    msg.textContent = 'Submitting request…';
+    try{
+      const r = await fetch('/api/payment-requests',{
+        method:'POST', credentials:'same-origin', body
+      });
+      const data = await r.json();
+      if(!r.ok) throw new Error(data.error || 'Request failed');
+      msg.textContent = data.message || 'Request submitted for admin review.';
+      depositForm.reset();
+      await loadDepositSettings();
+    }catch(err){ msg.textContent = err.message; }
+  });
+}
+
+async function loadWalletBalance() {
+  try {
+    const response = await fetch('/api/wallet');
+    if (response.status === 401) return;
+    if (!response.ok) throw new Error('Wallet load failed');
+
+    const data = await response.json();
+    const amount = document.querySelector('.balance .amount');
+
+    if (amount) {
+      amount.textContent = 'Rs. ' +
+        (Number(data.balance_paisa || 0) / 100).toFixed(2);
+    }
+  } catch (error) {
+    console.error('Wallet balance load nahi hua:', error);
+  }
+}
+
+loadWalletBalance();
+loadDepositSettings();
+</script>
+</body>
+</html>
+

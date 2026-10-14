@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8">
+<title>ProfitZone Admin Login</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f4f6f8;color:#17202a;
+max-width:420px;margin:60px auto;padding:18px}
+.card{background:white;padding:22px;border-radius:12px}
+input,button{box-sizing:border-box;width:100%;padding:12px;margin:8px 0}
+button{background:#155eef;color:white;border:0;border-radius:7px}
+#msg{color:#b42318;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<div class="card">
+<h2>ProfitZone Admin</h2>
+<p>Admin sign in</p>
+<form id="loginForm">
+<label>Admin username</label>
+<input id="username" autocomplete="username" required maxlength="80">
+<label>Admin password</label>
+<input id="password" type="password" autocomplete="current-password"
+required maxlength="256">
+<button type="submit">Log in</button>
+</form>
+<p id="msg" role="alert"></p>
+</div>
+<script>
+document.getElementById('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('msg');
+  msg.textContent = 'Checking…';
+  try {
+    const r = await fetch('/api/admin/login', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        username: document.getElementById('username').value,
+        password: document.getElementById('password').value
+      })
+    });
+    const d = await r.json();
+    if (!r.ok) throw Error(d.error || 'Login failed');
+    location.href = '/admin';
+  } catch (err) {
+    msg.textContent = err.message || 'Login failed';
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,582 @@
+
+import os
+from pathlib import Path
+import sqlite3
+
+_env_file = Path(__file__).with_name(".env")
+if _env_file.exists():
+    for _line in _env_file.read_text().splitlines():
+        if "=" in _line and not _line.lstrip().startswith("#"):
+            _key, _value = _line.split("=", 1)
+            os.environ.setdefault(_key.strip(), _value.strip())
+from functools import wraps
+from flask import Flask, request, jsonify, session
+from werkzeug.security import generate_password_hash, check_password_hash
+
+app = Flask(__name__)
+app.secret_key = os.environ.get("PROFITZONE_SECRET")
+
+if not app.secret_key:
+    raise RuntimeError(
+        "Set PROFITZONE_SECRET before starting the app."
+    )
+
+DB = os.path.join(os.path.dirname(__file__), "users.db")
+
+def init_available_tasks():
+    with get_db() as db:
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS available_tasks (
+                task_key TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                reward_paisa INTEGER NOT NULL DEFAULT 0,
+                active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        db.executemany("""
+            INSERT OR IGNORE INTO available_tasks
+            (task_key, title, description, reward_paisa)
+            VALUES (?, ?, ?, ?)
+        """, [
+            ("daily_checkin", "Daily check-in",
+             "Open your dashboard and review your account.", 0),
+            ("explore_site", "Explore ProfitZone",
+             "Visit the Tasks and Account sections.", 0)
+        ])
+
+
+
+
+def get_db():
+    conn = sqlite3.connect(DB)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+with get_db() as db:
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL COLLATE NOCASE UNIQUE,
+            email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+            phone TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            invitation_code TEXT DEFAULT '',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+
+init_available_tasks()
+
+
+def login_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if "user_id" not in session:
+            return jsonify(error="Please log in first"), 401
+        return fn(*args, **kwargs)
+    return wrapper
+
+
+def admin_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if "user_id" not in session:
+            return jsonify(error="Please log in first"), 401
+        admin_id = os.environ.get("PROFITZONE_ADMIN_USER_ID")
+        if not admin_id or str(session["user_id"]) != admin_id:
+            return jsonify(error="Admin access required"), 403
+        return fn(*args, **kwargs)
+    return wrapper
+
+
+@app.get("/")
+def home():
+    from flask import send_from_directory
+    return send_from_directory(os.path.dirname(__file__), "login.html")
+
+@app.post("/api/signup")
+def signup():
+    data = request.get_json(silent=True) or {}
+    username = str(data.get("username", "")).strip()
+    email = str(data.get("email", "")).strip()
+    phone = str(data.get("phone", "")).strip()
+    password = str(data.get("password", ""))
+    invitation = str(data.get("invitation_code", "")).strip()
+
+    if not all([username, email, phone, password]):
+        return jsonify(error="All required fields must be filled"), 400
+    if len(username) < 3 or len(username) > 30:
+        return jsonify(error="Username must be 3-30 characters"), 400
+    if len(password) < 10 or len(password) > 128:
+        return jsonify(error="Password must be 10-128 characters"), 400
+    if len(email) > 254 or "@" not in email:
+        return jsonify(error="Enter a valid email"), 400
+    if len(phone) > 30 or len(invitation) > 50:
+        return jsonify(error="Input is too long"), 400
+
+    try:
+        with get_db() as db:
+            cur = db.execute("""
+                INSERT INTO users
+                (username, email, phone, password_hash, invitation_code)
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                username, email, phone,
+                generate_password_hash(password), invitation
+            ))
+            user_id = cur.lastrowid
+    except sqlite3.IntegrityError:
+        return jsonify(error="Username, email or phone already registered"), 409
+
+    session.clear()
+    session["user_id"] = user_id
+    return jsonify(message="Account created", username=username), 201
+
+
+@app.post("/api/login")
+def login():
+    data = request.get_json(silent=True) or {}
+    identity = str(data.get("identity", "")).strip()
+    password = str(data.get("password", ""))
+
+    with get_db() as db:
+        user = db.execute("""
+            SELECT * FROM users
+            WHERE username = ? OR email = ? OR phone = ?
+        """, (identity, identity, identity)).fetchone()
+
+    if not user or not check_password_hash(user["password_hash"], password):
+        return jsonify(error="Invalid login details"), 401
+
+    session.clear()
+    session["user_id"] = user["id"]
+    return jsonify(message="Login successful", username=user["username"])
+
+
+@app.get("/api/me")
+@login_required
+def me():
+    with get_db() as db:
+        user = db.execute(
+            "SELECT username, email, phone FROM users WHERE id = ?",
+            (session["user_id"],)
+        ).fetchone()
+    if not user:
+        session.clear()
+        return jsonify(error="Account not found"), 404
+    return jsonify(dict(user))
+
+
+@app.post("/api/logout")
+def logout():
+    session.clear()
+    return jsonify(message="Logged out")
+
+
+@app.get("/dashboard")
+@login_required
+def dashboard():
+    from flask import send_from_directory
+    return send_from_directory(os.path.dirname(__file__), "index.html")
+@app.get("/api/wallet")
+@login_required
+def wallet():
+    db = get_db()
+    wallet = db.execute(
+        "SELECT balance_paisa FROM wallets WHERE user_id = ?",
+        (session["user_id"],)
+    ).fetchone()
+
+    transactions = db.execute(
+        """SELECT type, amount_paisa, status, created_at
+           FROM transactions
+           WHERE user_id = ?
+           ORDER BY id DESC LIMIT 20""",
+        (session["user_id"],)
+    ).fetchall()
+
+    return jsonify({
+        "balance_paisa": wallet["balance_paisa"] if wallet else 0,
+        "transactions": [dict(t) for t in transactions]
+    })
+
+
+
+@app.get("/tasks")
+@login_required
+def profitzone_tasks_page():
+    from flask import render_template_string
+    with get_db() as db:
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS task_submissions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                task_key TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, task_key)
+            )
+        """)
+        tasks = db.execute("""
+            SELECT a.task_key, a.title, a.description, a.reward_paisa,
+                   CASE WHEN t.id IS NULL THEN 0 ELSE 1 END AS submitted
+            FROM available_tasks a
+            LEFT JOIN task_submissions t
+              ON t.task_key = a.task_key AND t.user_id = ?
+            WHERE a.active = 1
+            ORDER BY a.created_at DESC
+        """, (session["user_id"],)).fetchall()
+
+    return render_template_string("""<!doctype html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ProfitZone Tasks</title>
+<style>
+body{font-family:Arial;background:#eef5f7;margin:0;color:#203746}
+header{background:#087f8c;color:white;padding:24px}
+main{padding:18px;max-width:650px;margin:auto}
+.card{background:white;padding:18px;border-radius:16px;margin:14px 0}
+button{background:#078875;color:white;border:0;border-radius:9px;padding:12px 18px}
+small{color:#607780}
+</style>
+</head>
+<body>
+<header><h1>ProfitZone Tasks</h1><p>Complete tasks and submit for review</p></header>
+<main>
+<p><a href="/dashboard">← Back to dashboard</a></p>
+{% for task in tasks %}
+<div class="card">
+<h3>{{ task['title'] }}</h3>
+<p>{{ task['description'] }}</p>
+<small>Reward: Rs. {{ "%.2f"|format(task['reward_paisa'] / 100) }} · Subject to review</small>
+<p><button id='btn-{{ task["task_key"] }}'
+       {% if task["submitted"] %}disabled{% endif %}
+       onclick='submitTask({{ task["task_key"]|tojson }})'>{{ "Submitted ✓" if task["submitted"] else "Submit task" }}</button></p>
+</div>
+{% else %}
+<div class="card"><p>No active tasks available right now.</p></div>
+{% endfor %}
+<p id="msg"></p>
+<script>
+async function submitTask(key){
+ const msg=document.getElementById('msg');
+ msg.textContent='Submitting...';
+ try{
+  const r=await fetch('/api/tasks/submit',{method:'POST',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({task_key:key})});
+  const d=await r.json();
+  msg.textContent=d.message||d.error||'Request complete';
+  if(r.ok && d.message && (
+      d.message.includes('submitted for review') ||
+      d.message.includes('already submitted')
+  )){
+    const btn=document.getElementById('btn-'+key);
+    if(btn){btn.textContent='Submitted ✓';btn.disabled=true;}
+  }
+ }catch(e){msg.textContent='Request failed. Please try again.'}
+}
+</script>
+</main></body></html>""", tasks=tasks)
+
+@app.post("/api/tasks/submit")
+@login_required
+def profitzone_submit_task():
+    data = request.get_json(silent=True) or {}
+    key = str(data.get("task_key", "")).strip()
+
+    with get_db() as db:
+        task = db.execute(
+            "SELECT task_key FROM available_tasks WHERE task_key = ? AND active = 1",
+            (key,)
+        ).fetchone()
+        if not task:
+            return jsonify(error="Task not found or inactive"), 400
+
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS task_submissions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                task_key TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, task_key)
+            )
+        """)
+        try:
+            db.execute(
+                "INSERT INTO task_submissions(user_id, task_key) VALUES (?, ?)",
+                (session["user_id"], key)
+            )
+            db.commit()
+            return jsonify(message="Task submitted for review.")
+        except sqlite3.IntegrityError:
+            return jsonify(message="You have already submitted this task.")
+
+@app.get("/api/admin/tasks")
+@admin_required
+def profitzone_admin_tasks_api():
+    from flask import jsonify
+    db = get_db()
+    try:
+        rows = db.execute("""
+            SELECT id, user_id, task_key, status, created_at
+            FROM task_submissions
+            ORDER BY id DESC LIMIT 100
+        """).fetchall()
+        return jsonify({"tasks": [dict(row) for row in rows]})
+    finally:
+        db.close()
+
+
+
+
+
+
+
+@app.get("/api/admin/available-tasks")
+@admin_required
+def profitzone_admin_available_tasks():
+    with get_db() as db:
+        rows = db.execute("""
+            SELECT task_key, title, description, reward_paisa, active
+            FROM available_tasks ORDER BY created_at DESC
+        """).fetchall()
+    return jsonify(tasks=[dict(r) for r in rows])
+
+
+@app.post("/api/admin/available-tasks")
+@admin_required
+def profitzone_admin_create_task():
+    data = request.get_json(silent=True) or {}
+    title = str(data.get("title", "")).strip()
+    description = str(data.get("description", "")).strip()
+    key = str(data.get("task_key", "")).strip().lower()
+    try:
+        reward = round(float(data.get("reward", 0)) * 100)
+    except (TypeError, ValueError):
+        return jsonify(error="Enter a valid reward"), 400
+    if not key or not key.replace("_", "").isalnum() or len(key) > 40:
+        return jsonify(error="Task key must use letters, numbers, underscores"), 400
+    if not title or len(title) > 100 or not description or len(description) > 500:
+        return jsonify(error="Enter a title (max 100) and description (max 500)"), 400
+    if reward < 0 or reward > 100000000:
+        return jsonify(error="Reward must be between Rs. 0 and Rs. 1,000,000"), 400
+    with get_db() as db:
+        try:
+            db.execute("""
+                INSERT INTO available_tasks
+                (task_key, title, description, reward_paisa)
+                VALUES (?, ?, ?, ?)
+            """, (key, title, description, reward))
+            db.commit()
+        except sqlite3.IntegrityError:
+            return jsonify(error="That task key already exists"), 409
+    return jsonify(message="Task created", task_key=key), 201
+
+
+@app.post("/api/admin/available-tasks/<task_key>/toggle")
+@admin_required
+def profitzone_admin_toggle_task(task_key):
+    with get_db() as db:
+        cur = db.execute("""
+            UPDATE available_tasks SET active = CASE active WHEN 1 THEN 0 ELSE 1 END
+            WHERE task_key = ?
+        """, (task_key,))
+        if cur.rowcount != 1:
+            return jsonify(error="Task not found"), 404
+        db.commit()
+        row = db.execute(
+            "SELECT active FROM available_tasks WHERE task_key = ?", (task_key,)
+        ).fetchone()
+    return jsonify(message="Task status updated", active=row["active"])
+
+
+@app.get("/admin")
+@admin_required
+def profitzone_admin_dashboard():
+    from flask import send_from_directory
+    return send_from_directory(os.path.dirname(__file__), "admin.html")
+
+
+@app.get("/api/admin/users")
+@admin_required
+def profitzone_admin_users_api():
+    with get_db() as db:
+        rows = db.execute("""
+            SELECT u.id, u.username, u.email, u.phone, u.created_at,
+                   COALESCE(w.balance_paisa, 0) AS balance_paisa
+            FROM users u LEFT JOIN wallets w ON w.user_id = u.id
+            ORDER BY u.id DESC LIMIT 200
+        """).fetchall()
+    return jsonify(users=[dict(r) for r in rows])
+
+
+@app.get("/api/admin/payments")
+@admin_required
+def profitzone_admin_payments_api():
+    with get_db() as db:
+        rows = db.execute("""
+            SELECT p.id, p.user_id, u.username, p.request_type,
+                   p.amount_paisa, p.method, p.reference, p.status, p.created_at
+            FROM payment_requests p LEFT JOIN users u ON u.id = p.user_id
+            ORDER BY p.id DESC LIMIT 200
+        """).fetchall()
+    return jsonify(requests=[dict(r) for r in rows])
+
+
+@app.post("/api/admin/payments/<int:request_id>")
+@admin_required
+def profitzone_admin_review_payment(request_id):
+    data = request.get_json(silent=True) or {}
+    status = data.get("status")
+    if status not in ("approved", "rejected"):
+        return jsonify(error="Status must be approved or rejected"), 400
+    with get_db() as db:
+        cur = db.execute("""
+            UPDATE payment_requests SET status = ?
+            WHERE id = ? AND status = 'pending'
+        """, (status, request_id))
+        if cur.rowcount != 1:
+            return jsonify(error="Request not found or already reviewed"), 409
+        db.commit()
+    return jsonify(message="Request status updated", status=status)
+
+
+@app.post("/api/admin/tasks/<int:task_id>")
+@admin_required
+def profitzone_admin_review_task(task_id):
+    data = request.get_json(silent=True) or {}
+    status = data.get("status")
+    if status not in ("approved", "rejected"):
+        return jsonify(error="Status must be approved or rejected"), 400
+    with get_db() as db:
+        cur = db.execute("""
+            UPDATE task_submissions SET status = ?
+            WHERE id = ? AND status = 'pending'
+        """, (status, task_id))
+        if cur.rowcount != 1:
+            return jsonify(error="Task not found or already reviewed"), 409
+        db.commit()
+    return jsonify(message="Task status updated", status=status)
+
+
+@app.post("/api/payment-requests")
+@login_required
+def profitzone_payment_request_api():
+    from flask import request, jsonify
+    data = request.get_json(silent=True) or {}
+    kind = data.get("type")
+    method = str(data.get("method", "")).strip()[:60]
+    reference = str(data.get("reference", "")).strip()[:120]
+
+    if kind not in ("deposit", "withdraw"):
+        return jsonify({"error": "Invalid request type"}), 400
+
+    try:
+        amount = round(float(data.get("amount", 0)) * 100)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Enter a valid amount"}), 400
+
+    if amount < 100 or amount > 100000000:
+        return jsonify({"error": "Amount must be between Rs. 1 and Rs. 1,000,000"}), 400
+
+    db = get_db()
+    try:
+        db.execute("""
+            INSERT INTO payment_requests
+            (user_id, request_type, amount_paisa, method, reference)
+            VALUES (?, ?, ?, ?, ?)
+        """, (session["user_id"], kind, amount, method, reference))
+        db.commit()
+        return jsonify({
+            "message": "Request submitted for admin review.",
+            "status": "pending"
+        }), 201
+    finally:
+        db.close()
+
+@app.route("/payments", methods=["GET"])
+@login_required
+def profitzone_payments_page():
+    return """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ProfitZone Payments</title>
+</head>
+<body style="font-family:Arial;max-width:420px;margin:30px auto;padding:16px">
+  <h2>ProfitZone</h2>
+  <h3>Deposit / Withdraw</h3>
+
+  <form id="paymentForm">
+    <label>Request type</label>
+    <select id="type" required style="width:100%;padding:12px;margin:8px 0">
+      <option value="deposit">Deposit</option>
+      <option value="withdraw">Withdraw</option>
+    </select>
+
+    <label>Amount (PKR)</label>
+    <input id="amount" type="number" min="1" max="1000000"
+      step="1" required placeholder="Enter amount"
+      style="width:100%;padding:12px;margin:8px 0">
+
+    <label>Payment method</label>
+    <input id="method" required placeholder="Easypaisa / JazzCash"
+      style="width:100%;padding:12px;margin:8px 0">
+
+    <label>Reference number (optional)</label>
+    <input id="reference" placeholder="Transaction reference"
+      style="width:100%;padding:12px;margin:8px 0">
+
+    <button type="submit" style="width:100%;padding:12px">
+      Submit Request
+    </button>
+  </form>
+
+  <p id="result"></p>
+
+  <script>
+  document.getElementById("paymentForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+    const result = document.getElementById("result");
+    result.textContent = "Submitting...";
+
+    try {
+      const response = await fetch("/api/payment-requests", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          type: document.getElementById("type").value,
+          amount: document.getElementById("amount").value,
+          method: document.getElementById("method").value,
+          reference: document.getElementById("reference").value
+        })
+      });
+
+      const data = await response.json();
+      result.textContent = response.ok
+        ? "Request submitted. Status: pending."
+        : (data.error || data.message || "Request failed.");
+    } catch (error) {
+      result.textContent = "Connection error. Check the server.";
+    }
+  });
+  </script>
+</body>
+</html>
+    """
+
+
+
+
+if __name__ == "__main__":
+    app.run(host="127.0.0.1", port=5000, debug=False)
+
+

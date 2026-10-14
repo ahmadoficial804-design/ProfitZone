@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ProfitZone Admin</title>
+<style>
+body{font-family:Arial,sans-serif;max-width:900px;margin:24px auto;padding:16px;background:#f4f6f8;color:#17202a}
+h1{margin-bottom:6px}.muted{color:#667085}.card{background:white;padding:16px;margin:12px 0;border-radius:12px;overflow-wrap:anywhere}
+button{padding:9px 12px;margin:4px;border:0;border-radius:7px;background:#155eef;color:white}
+pre{white-space:pre-wrap;overflow-wrap:anywhere}
+</style>
+</head><body>
+<h1>ProfitZone Admin</h1><p class="muted">Admin account only · Review requests carefully</p>
+<button onclick="loadAll()">Refresh</button>
+<button onclick="adminLogout()">Admin Logout</button>
+<div class="card"><h2>Users</h2><pre id="users">Loading…</pre></div>
+<div class="card">
+<h2>Task Management</h2>
+<form id="taskForm">
+<label>Task key (unique, e.g. watch_video)</label>
+<input id="taskKey" required maxlength="40" pattern="[A-Za-z0-9_]+"
+style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box">
+<label>Task title</label>
+<input id="taskTitle" required maxlength="100"
+style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box">
+<label>Description</label>
+<textarea id="taskDescription" required maxlength="500"
+style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box"></textarea>
+<label>Reward (PKR, display only)</label>
+<input id="taskReward" type="number" min="0" max="1000000" step="0.01" value="0" required
+style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box">
+<button type="submit">Add Task</button>
+</form><p id="taskFormMessage"></p>
+<div id="availableTasks"></div>
+</div>
+
+<div class="card">
+<h2>Deposit Payment Settings</h2>
+<p class="muted">These details will be shown to logged-in members.</p>
+<form id="paymentSettingsForm">
+<label>Payment Method</label>
+<select id="payMethod" required style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box">
+<option value="JazzCash">JazzCash</option>
+<option value="Easypaisa">Easypaisa</option>
+</select>
+<label>Account Holder Name</label>
+<input id="payName" required maxlength="100" style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box">
+<label>Payment Number</label>
+<input id="payNumber" required maxlength="50" style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box">
+<label>Instructions for members</label>
+<textarea id="payInstructions" maxlength="500" style="display:block;width:100%;padding:10px;margin:8px 0;box-sizing:border-box"></textarea>
+<button type="submit">Save Payment Settings</button>
+<button type="button" id="clearPaymentSettings">Delete / Hide Payment Details</button>
+</form>
+<p id="paymentSettingsMessage"></p>
+</div>
+<div class="card"><h2>Payment requests</h2><div id="payments">Loading…</div></div>
+<div class="card"><h2>Task submissions</h2>
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;text-align:left">
+<thead><tr>
+<th style="padding:10px;border-bottom:1px solid #ddd">Username</th>
+<th style="padding:10px;border-bottom:1px solid #ddd">Task</th>
+<th style="padding:10px;border-bottom:1px solid #ddd">Date</th>
+<th style="padding:10px;border-bottom:1px solid #ddd">Status</th>
+<th style="padding:10px;border-bottom:1px solid #ddd">Action</th>
+</tr></thead>
+<tbody id="tasks"><tr><td colspan="5">Loading…</td></tr></tbody>
+</table></div></div>
+<script>
+async function adminLogout(){
+  try {
+    await fetch('/api/admin/logout', {
+      method:'POST', credentials:'same-origin'
+    });
+  } finally {
+    location.href='/admin/login';
+  }
+}
+
+async function api(url, options={}) {
+  const r=await fetch(url,{credentials:'same-origin',...options,
+    headers:{'Content-Type':'application/json',...(options.headers||{})}});
+  const raw=await r.text();
+  let d;
+  try { d=JSON.parse(raw); }
+  catch { throw Error('API '+url+' returned HTTP '+r.status+
+    ' ('+(r.headers.get('content-type')||'unknown content type')+'): '+
+    raw.slice(0,160)); }
+  if(!r.ok) throw Error(d.error||('HTTP '+r.status));
+  return d;
+}
+function el(id, text){document.getElementById(id).textContent=text;}
+function cardText(x){return JSON.stringify(x,null,2);}
+
+async function loadPaymentSettings(){
+  try{
+    const d = await api('/api/admin/payment-settings');
+    const x = d.settings || {};
+    document.getElementById('payMethod').value =
+      x.method === 'Easypaisa' ? 'Easypaisa' : 'JazzCash';
+    document.getElementById('payName').value = x.account_name || '';
+    document.getElementById('payNumber').value = x.account_number || '';
+    document.getElementById('payInstructions').value = x.instructions || '';
+    el('paymentSettingsMessage', x.enabled ? 'Payment details are enabled.' : 'No active payment details.');
+  }catch(e){
+    el('paymentSettingsMessage', e.message);
+  }
+}
+document.getElementById('paymentSettingsForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  try{
+    await api('/api/admin/payment-settings', {
+      method:'POST',
+      body:JSON.stringify({
+        method:document.getElementById('payMethod').value,
+        account_name:document.getElementById('payName').value,
+        account_number:document.getElementById('payNumber').value,
+        instructions:document.getElementById('payInstructions').value
+      })
+    });
+    el('paymentSettingsMessage','Payment settings saved successfully.');
+  }catch(err){
+    el('paymentSettingsMessage',err.message);
+  }
+});
+document.getElementById('clearPaymentSettings').addEventListener('click', async ()=>{
+  if(!confirm('Hide and clear the current payment details?')) return;
+  try{
+    await api('/api/admin/payment-settings',{method:'DELETE'});
+    document.getElementById('paymentSettingsForm').reset();
+    el('paymentSettingsMessage','Payment details cleared.');
+  }catch(err){
+    el('paymentSettingsMessage',err.message);
+  }
+});
+
+async function loadAll(){
+  loadPaymentSettings();
+  try{
+    const [u,p,t,a]=await Promise.all([
+      api('/api/admin/users'),api('/api/admin/payments'),
+      api('/api/admin/tasks'),api('/api/admin/available-tasks')
+    ]);
+    renderAvailableTasks(a.tasks||[]);
+    const ud=document.getElementById('users');
+    ud.replaceChildren();
+    (u.users||[]).forEach(x=>{
+      const d=document.createElement('div');
+      d.className='card';
+      d.style.border='1px solid #d8dee8';
+      d.style.margin='12px 0';
+      const title=document.createElement('h3');
+      title.textContent=x.username || ('User '+x.id);
+      d.append(title);
+      const details=[
+        ['User ID',x.id],
+        ['Email',x.email],
+        ['Phone',x.phone],
+        ['Wallet balance','Rs. '+((Number(x.balance_paisa)||0)/100).toFixed(2)],
+        ['Joined',x.created_at]
+      ];
+      details.forEach(([label,value])=>{
+        const row=document.createElement('p');
+        const strong=document.createElement('strong');
+        strong.textContent=label+': ';
+        row.append(strong,document.createTextNode(value ?? '—'));
+        d.append(row);
+      });
+      ud.append(d);
+    });
+    if(!(u.users||[]).length) el('users','No users found.');
+    const pd=document.getElementById('payments');pd.replaceChildren();
+    (p.requests||[]).forEach(x=>{
+      const d=document.createElement('div');d.className='card';
+      const pre=document.createElement('pre');pre.textContent=cardText(x);d.append(pre);
+      if(x.screenshot_filename){
+        const image=document.createElement('img');
+        image.src='/api/admin/payment-receipts/'+encodeURIComponent(x.screenshot_filename);
+        image.alt='Payment receipt';
+        image.loading='lazy';
+        image.style.maxWidth='100%';
+        image.style.maxHeight='420px';
+        image.style.objectFit='contain';
+        image.style.display='block';
+        image.style.margin='12px 0';
+        image.onerror=()=>{image.alt='Receipt preview unavailable';};
+        d.append(image);
+      } else {
+        const note=document.createElement('p');
+        note.textContent='No receipt image attached.';
+        d.append(note);
+      }
+      if(x.status==='pending'){
+        for(const status of ['approved','rejected']){
+          const b=document.createElement('button');b.textContent=status;
+          b.onclick=async()=>{try{await api('/api/admin/payments/'+x.id,{method:'POST',body:JSON.stringify({status})});await loadAll()}catch(e){alert(e.message)}};
+          d.append(b);
+        }
+      }pd.append(d);
+    });
+    const td=document.getElementById('tasks');
+    td.replaceChildren();
+    (t.tasks||[]).forEach(x=>{
+      const tr=document.createElement('tr');
+      const values=[
+        x.username || ('User '+x.user_id),
+        x.title || x.task_key,
+        x.created_at || '—',
+        x.status || '—'
+      ];
+      values.forEach(value=>{
+        const cell=document.createElement('td');
+        cell.style.padding='10px';
+        cell.style.borderBottom='1px solid #ddd';
+        cell.textContent=value;
+        tr.append(cell);
+      });
+      const action=document.createElement('td');
+      action.style.padding='10px';
+      action.style.borderBottom='1px solid #ddd';
+      if(x.status==='pending'){
+        for(const status of ['approved','rejected']){
+          const b=document.createElement('button');
+          b.textContent=status==='approved'?'Approve':'Reject';
+          b.onclick=async()=>{
+            try{
+              await api('/api/admin/tasks/'+x.id,{
+                method:'POST',
+                body:JSON.stringify({status})
+              });
+              await loadAll();
+            }catch(e){alert(e.message)}
+          };
+          action.append(b,document.createTextNode(' '));
+        }
+      }else{
+        action.textContent='—';
+      }
+      tr.append(action);
+      td.append(tr);
+    });
+  }catch(e){alert(e.message)}
+}
+
+function renderAvailableTasks(tasks){
+  const box=document.getElementById('availableTasks');
+  box.replaceChildren();
+  tasks.forEach(x=>{
+    const d=document.createElement('div');d.className='card';
+    const h=document.createElement('h3');h.textContent=x.title;d.append(h);
+    const p=document.createElement('p');p.textContent=x.description;d.append(p);
+    const meta=document.createElement('p');
+    meta.textContent='Key: '+x.task_key+' · Reward: Rs. '+(Number(x.reward_paisa||0)/100).toFixed(2)+' · '+(x.active?'Active':'Inactive');
+    d.append(meta);
+    const b=document.createElement('button');b.textContent=x.active?'Deactivate':'Activate';
+    b.onclick=async()=>{try{await api('/api/admin/available-tasks/'+encodeURIComponent(x.task_key)+'/toggle',{method:'POST',body:'{}'});await loadAll()}catch(e){alert(e.message)}};
+    d.append(b);box.append(d);
+  });
+  if(!tasks.length) box.textContent='No tasks yet.';
+}
+document.getElementById('taskForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const msg=document.getElementById('taskFormMessage');
+  msg.textContent='Saving...';
+  try{
+    await api('/api/admin/available-tasks',{method:'POST',body:JSON.stringify({
+      task_key:document.getElementById('taskKey').value.trim(),
+      title:document.getElementById('taskTitle').value.trim(),
+      description:document.getElementById('taskDescription').value.trim(),
+      reward:document.getElementById('taskReward').value
+    })});
+    e.target.reset();document.getElementById('taskReward').value='0';
+    msg.textContent='Task added.';await loadAll();
+  }catch(err){msg.textContent=err.message}
+});
+
+loadAll();
+</script></body></html>
